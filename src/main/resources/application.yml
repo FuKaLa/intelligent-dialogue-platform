@@ -1,0 +1,42 @@
+spring:
+  # 应用配置
+  application:
+    name: intelligent-dialogue-platform
+  
+  # Redis配置
+  redis:
+    host: localhost
+    port: 6379
+    timeout: 3000
+  
+  # Spring AI OpenAI配置（对接本地大模型）
+  ai:
+    openai:
+      base-url: http://10.8.0.54:6003/v1
+      api-key: dev-key
+      chat:
+        model: Qwen3.5_122B_A10B
+
+# 本地中间件配置
+middleware:
+  # Milvus向量数据库
+  milvus:
+    host: localhost
+    port: 19530
+  
+  # Elasticsearch
+  elasticsearch:
+    host: localhost
+    port: 9200
+
+# 服务器配置
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+# 日志配置
+logging:
+  level:
+    root: info
+    com.agentai: debug
