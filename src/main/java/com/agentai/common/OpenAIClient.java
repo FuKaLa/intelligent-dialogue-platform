@@ -1,111 +1,89 @@
 package com.agentai.common;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
-import java.util.List;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * OpenAI客户端实现
- * 用于调用本地LLM，使用OpenAI兼容API
+ * OpenAI客户端
+ * 用于调用LLM服务
  */
 @Component
 public class OpenAIClient {
     
-    @Value("${spring.ai.openai.base-url}")
-    private String baseUrl;
-    
-    @Value("${spring.ai.openai.api-key}")
-    private String apiKey;
-    
-    @Value("${spring.ai.openai.chat.model}")
-    private String model;
-    
-    private final RestTemplate restTemplate = new RestTemplate();
+    private static final String API_URL = "http://10.8.0.54:6003/v1/chat/completions";
+    private static final String API_KEY = "dev-key";
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     /**
-     * 调用LLM生成回复
-     * @param prompt 提示词
-     * @return 生成的回复
+     * 调用LLM服务
+     * @param promptTemplate 提示模板
+     * @param params 参数
+     * @return LLM响应
      */
-    public String call(String prompt) {
+    public String call(String promptTemplate, Map<String, Object> params) {
         try {
-            // 构建请求体
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", model);
-            
-            Map<String, String> message = new HashMap<>();
-            message.put("role", "user");
-            message.put("content", prompt);
-            
-            requestBody.put("messages", List.of(message));
-            requestBody.put("temperature", 0.7);
-            
-            // 构建请求头
-            Map<String, String> headers = new HashMap<>();
-            headers.put("Content-Type", "application/json");
-            headers.put("Authorization", "Bearer " + apiKey);
-            
-            // 创建请求实体
-            org.springframework.http.HttpEntity<Map<String, Object>> entity = 
-                    new org.springframework.http.HttpEntity<>(requestBody, 
-                            new org.springframework.http.HttpHeaders() {
-                                {
-                                    setAll(headers);
-                                }
-                            });
-            
-            // 发送请求
-            Map<String, Object> response = restTemplate.postForObject(
-                    baseUrl + "/chat/completions",
-                    entity,
-                    Map.class
-            );
-            
-            // 解析响应
-            if (response != null && response.containsKey("choices")) {
-                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                if (!choices.isEmpty()) {
-                    Map<String, Object> choice = choices.get(0);
-                    Map<String, Object> messageObj = (Map<String, Object>) choice.get("message");
-                    return (String) messageObj.get("content");
-                }
-            }
-            throw new BusinessException("大模型返回结果解析失败");
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            // 记录异常
-            e.printStackTrace();
-            // 抛出业务异常
-            throw new BusinessException("大模型调用失败: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * 调用LLM生成回复（带参数）
-     * @param template 提示词模板
-     * @param params 模板参数
-     * @return 生成的回复
-     */
-    public String call(String template, Map<String, Object> params) {
-        try {
-            // 替换模板参数
-            String prompt = template;
+            // 替换模板中的参数
+            String prompt = promptTemplate;
             for (Map.Entry<String, Object> entry : params.entrySet()) {
                 prompt = prompt.replace("{" + entry.getKey() + "}", entry.getValue().toString());
             }
             
-            // 调用大模型
-            return call(prompt);
+            final String finalPrompt = prompt;
+            
+            // 构建请求体
+            Map<String, Object> requestBody = new java.util.HashMap<>();
+            requestBody.put("model", "gpt-3.5-turbo");
+            requestBody.put("messages", java.util.Arrays.asList(
+                    new java.util.HashMap<String, Object>() {{ put("role", "system"); put("content", "你是一个智能对话助手"); }},
+                    new java.util.HashMap<String, Object>() {{ put("role", "user"); put("content", finalPrompt); }}
+            ));
+            requestBody.put("temperature", 0.7);
+            
+            // 发送请求
+            URL url = new URL(API_URL);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer " + API_KEY);
+            connection.setDoOutput(true);
+            
+            // 写入请求体
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = objectMapper.writeValueAsBytes(requestBody);
+                os.write(input, 0, input.length);
+            }
+            
+            // 读取响应
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                StringBuilder response = new StringBuilder();
+                String responseLine = null;
+                while ((responseLine = br.readLine()) != null) {
+                    response.append(responseLine.trim());
+                }
+                
+                // 解析响应
+                Map<String, Object> responseMap = objectMapper.readValue(response.toString(), Map.class);
+                java.util.List<Map<String, Object>> choices = (java.util.List<Map<String, Object>>) responseMap.get("choices");
+                if (choices != null && !choices.isEmpty()) {
+                    Map<String, Object> choice = choices.get(0);
+                    Map<String, Object> message = (Map<String, Object>) choice.get("message");
+                    return (String) message.get("content");
+                }
+            }
         } catch (Exception e) {
-            // 记录异常
             e.printStackTrace();
-            // 抛出业务异常
-            throw new BusinessException("大模型调用失败: " + e.getMessage());
+            throw new BusinessException("LLM调用失败: " + e.getMessage());
         }
+        
+        return "";
     }
 }

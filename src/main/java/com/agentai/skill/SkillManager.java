@@ -3,35 +3,55 @@ package com.agentai.skill;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Map;
 
 /**
- * 技能管理器
+ * Skill管理器
+ * 管理和执行各种Skill
  */
 @Component
 public class SkillManager {
     
     @Autowired
-    private List<Skill> skills;
+    private CalculatorSkill calculatorSkill;
+    
+    @Autowired
+    private WeatherSkill weatherSkill;
+    
+    @Autowired
+    private SearchSkill searchSkill;
+    
+    @Autowired
+    private GreetingSkill greetingSkill;
+    
+    @Autowired
+    private HelpSkill helpSkill;
+    
+    @Autowired
+    private ChitchatSkill chitchatSkill;
     
     /**
-     * 执行技能
+     * 执行Skill
+     * @param skillName Skill名称
+     * @param slots 槽位信息
+     * @return Skill执行结果
      */
-    public String executeSkill(String intent, Map<String, Object> params) {
-        // 找到可以处理该意图的技能
-        for (Skill skill : skills) {
-            if (skill.canHandle(intent)) {
-                return skill.execute(params);
-            }
+    public String executeSkill(String skillName, Map<String, Object> slots) {
+        switch (skillName) {
+            case "calculator":
+                return calculatorSkill.execute(slots);
+            case "weather":
+                return weatherSkill.execute(slots);
+            case "search":
+                return searchSkill.execute(slots);
+            case "greeting":
+                return greetingSkill.execute(slots);
+            case "help":
+                return helpSkill.execute(slots);
+            case "chitchat":
+                return chitchatSkill.execute(slots);
+            default:
+                return "未知技能";
         }
-        return "抱歉，我无法处理这个请求";
-    }
-    
-    /**
-     * 获取所有技能
-     */
-    public List<Skill> getSkills() {
-        return skills;
     }
 }

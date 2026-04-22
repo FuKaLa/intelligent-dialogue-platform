@@ -55,6 +55,17 @@ public class ResponseResult<T> implements Serializable {
         return result;
     }
     
+    /**
+     * 失败响应（带数据）
+     */
+    public static <T> ResponseResult<T> error(String message, T data) {
+        ResponseResult<T> result = new ResponseResult<>();
+        result.setCode(ERROR_CODE);
+        result.setMessage(message);
+        result.setData(data);
+        return result;
+    }
+    
     // getter和setter方法
     public int getCode() {
         return code;
